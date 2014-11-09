@@ -1,2 +1,2 @@
 afsctool: afsctool.c
-	gcc -arch x86_64 -arch i386 -lz -o afsctool afsctool.c
+	gcc -Wno-multichar -lz -o afsctool afsctool.c -framework CoreFoundation -framework CoreServices
