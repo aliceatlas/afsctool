@@ -131,8 +131,8 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 	
 	if (statfs(inFile, &fsInfo) < 0)
 		return;
-	if (fsInfo.f_type != 17 && fsInfo.f_type != 23) {
-		printf("Expecting f_type of 17 or 23. f_type is %i.\n", fsInfo.f_type);
+	if (fsInfo.f_type != 17 && fsInfo.f_type != 23 && fsInfo.f_type != 24) {
+		printf("Expecting f_type of 17, 23, or 24. f_type is %i.\n", fsInfo.f_type);
 		return;
 	}
 	if (!S_ISREG(inFileInfo->st_mode))
@@ -1179,7 +1179,7 @@ void printFileInfo(const char *filepath, struct stat *fileinfo, bool appliedcomp
 		if (appliedcomp)
 			printf("Unable to compress file.\n");
 		else
-			printf("File is not HFS+ compressed.\n");
+			printf("File is not AFSC compressed.\n");
 		if ((filetype = getFileType(filepath)) != NULL)
 		{
 			printf("File content type: %s\n", filetype);
@@ -1215,7 +1215,7 @@ void printFileInfo(const char *filepath, struct stat *fileinfo, bool appliedcomp
 	else
 	{
 		if (!appliedcomp)
-			printf("File is HFS+ compressed.\n");
+			printf("File is AFSC compressed.\n");
 		if ((filetype = getFileType(filepath)) != NULL)
 		{
 			printf("File content type: %s\n", filetype);
@@ -1558,17 +1558,17 @@ void process_folder(FTS *currfolder, struct folder_info *folderinfo)
 void printUsage()
 {
 	printf("afsctool 1.6.4 (build 34)\n"
-		   "Report if file is HFS+ compressed:                        afsctool [-v] file\n"
-		   "Report if folder contains HFS+ compressed files:          afsctool [-fvvi] [-t <ContentType/Extension>] folder\n"
-		   "List HFS+ compressed files in folder:                     afsctool -l[fvv] folder\n"
-		   "Decompress HFS+ compressed file or folder:                afsctool -d[i] [-t <ContentType>] file/folder\n"
+		   "Report if file is AFSC compressed:                        afsctool [-v] file\n"
+		   "Report if folder contains AFSC compressed files:          afsctool [-fvvi] [-t <ContentType/Extension>] folder\n"
+		   "List AFSC compressed files in folder:                     afsctool -l[fvv] folder\n"
+		   "Decompress AFSC compressed file or folder:                afsctool -d[i] [-t <ContentType>] file/folder\n"
 		   "Create archive file with compressed data in data fork:    afsctool -a[d] src dst\n"
-		   "Extract HFS+ compression archive to file:                 afsctool -x[d] src dst\n"
-		   "Apply HFS+ compression to file or folder:                 afsctool -c[nlfvvi] [-<level>] [-m <size>] [-s <percentage>] [-t <ContentType>] file/folder\n\n"
+		   "Extract AFSC compression archive to file:                 afsctool -x[d] src dst\n"
+		   "Apply AFSC compression to file or folder:                 afsctool -c[nlfvvi] [-<level>] [-m <size>] [-s <percentage>] [-t <ContentType>] file/folder\n\n"
 		   "Options:\n"
 		   "-v Increase verbosity level\n"
 		   "-f Detect hard links\n"
-		   "-l List files that are HFS+ compressed (or if the -c option is given, files which fail to compress)\n"
+		   "-l List files that are AFSC compressed (or if the -c option is given, files which fail to compress)\n"
 		   "-L Allow large compressed blocks (not recommended)\n"
 		   "-n Do not verify files after compression (not recommended)\n"
 		   "-m <size> Largest file size to compress, in bytes\n"
@@ -1844,7 +1844,7 @@ int main (int argc, const char * argv[])
 		}
 		else if ((fileinfo.st_flags & UF_COMPRESSED) == 0)
 		{
-			fprintf(stderr, "%s: HFS+ compressed file required, this file is not HFS+ compressed\n", fullpath);
+			fprintf(stderr, "%s: AFSC compressed file required, this file is not AFSC compressed\n", fullpath);
 			return -1;
 		}
 		
@@ -2091,9 +2091,9 @@ int main (int argc, const char * argv[])
 		else
 		{
 			if ((fileinfo.st_flags & UF_COMPRESSED) != 0)
-				printf("File is HFS+ compressed.\n");
+				printf("File is AFSC compressed.\n");
 			else
-				printf("File is not HFS+ compressed.\n");
+				printf("File is not AFSC compressed.\n");
 		}
 	}
 	else if (argIsFile && printVerbose > 0)
@@ -2179,7 +2179,7 @@ int main (int argc, const char * argv[])
 							printf("\n");
 					}
 					if (!folderinfo.invert_filetypelist)
-						printf("Number of HFS+ compressed files: %lld\n", folderinfo.filetypes[i].num_compressed);
+						printf("Number of AFSC compressed files: %lld\n", folderinfo.filetypes[i].num_compressed);
 					if (printVerbose > 0 && (!folderinfo.invert_filetypelist))
 					{
 						printf("Total number of files: %lld\n", folderinfo.filetypes[i].num_files);
@@ -2221,7 +2221,7 @@ int main (int argc, const char * argv[])
 				if (folderinfo.numfiletypes > 1 || folderinfo.invert_filetypelist)
 				{
 					printf("\nTotals of file content types\n");
-					printf("Number of HFS+ compressed files: %lld\n", alltypesinfo.num_compressed);
+					printf("Number of AFSC compressed files: %lld\n", alltypesinfo.num_compressed);
 					if (printVerbose > 0)
 					{
 						printf("Total number of files: %lld\n", alltypesinfo.num_files);
@@ -2254,7 +2254,7 @@ int main (int argc, const char * argv[])
 			else if (folderinfo.num_compressed == 0 && applycomp)
 				printf("No compressable files in folder\n");
 			else
-				printf("Number of HFS+ compressed files: %lld\n", folderinfo.num_compressed);
+				printf("Number of AFSC compressed files: %lld\n", folderinfo.num_compressed);
 			if (printVerbose > 0)
 			{
 				printf("Total number of files: %lld\n", folderinfo.num_files);
