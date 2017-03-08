@@ -131,8 +131,9 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 	
 	if (statfs(inFile, &fsInfo) < 0)
 		return;
-	if (fsInfo.f_type != 17 && fsInfo.f_type != 23 && fsInfo.f_type != 24) {
-		printf("Expecting f_type of 17, 23, or 24. f_type is %i.\n", fsInfo.f_type);
+	if (fsInfo.f_type != 17 && fsInfo.f_type != 23 && fsInfo.f_type != 24 && fsInfo.f_type != 25) {
+		printf("Expecting f_type of 17, 23, 24, or 25. f_type is %i (%s).\n",
+               fsInfo.f_type, fsInfo.f_fstypename);
 		return;
 	}
 	if (!S_ISREG(inFileInfo->st_mode))
