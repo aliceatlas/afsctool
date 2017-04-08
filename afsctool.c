@@ -17,6 +17,13 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
 
+// From CFURLPriv.h
+// TODO: there is a public API for this as of macOS 10.12 (though this private one remains available and working); we should probably use dlsym to dynamically find the symbols we need for each approach, use the newer public one if it is available, and fall back to this one otherwise.
+typedef CF_OPTIONS(unsigned long long, CFURLVolumePropertyFlags) {
+	kCFURLVolumeSupportsDecmpFSCompression = 0x800000000000000LL
+};
+CF_EXPORT Boolean _CFURLGetVolumePropertyFlags(CFURLRef url, CFURLVolumePropertyFlags mask, CFURLVolumePropertyFlags *flags, CFErrorRef *error) CF_AVAILABLE(10_6, 4_0);
+
 const char *sizeunit10_short[] = {"KB", "MB", "GB", "TB", "PB", "EB"};
 const char *sizeunit10_long[] = {"kilobytes", "megabytes", "gigabytes", "terabytes", "petabytes", "exabytes"};
 const long long int sizeunit10[] = {1000, 1000 * 1000, 1000 * 1000 * 1000, (long long int) 1000 * 1000 * 1000 * 1000, (long long int) 1000 * 1000 * 1000 * 1000 * 1000, (long long int) 1000 * 1000 * 1000 * 1000 * 1000 * 1000};
@@ -114,7 +121,9 @@ char* getSizeStr(long long int size, long long int size_rounded)
 void compressFile(const char *inFile, struct stat *inFileInfo, long long int maxSize, int compressionlevel, bool allowLargeBlocks, double minSavings, bool checkFiles)
 {
 	FILE *in;
-	struct statfs fsInfo;
+	CFStringRef filepathCF;
+	CFURLRef fileURL;
+	CFURLVolumePropertyFlags volFlags;
 	unsigned int compblksize = 0x10000, numBlocks, outdecmpfsSize = 0;
 	void *inBuf, *outBuf, *outBufBlock, *outdecmpfsBuf, *currBlock, *blockStart;
 	long long int inBufPos, filesize = inFileInfo->st_size;
@@ -129,12 +138,20 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 	times[1].tv_sec = inFileInfo->st_mtimespec.tv_sec;
 	times[1].tv_usec = inFileInfo->st_mtimespec.tv_nsec / 1000;
 	
-	if (statfs(inFile, &fsInfo) < 0)
-		return;
-	if (fsInfo.f_type != 17 && fsInfo.f_type != 23 && fsInfo.f_type != 24) {
-		printf("Expecting f_type of 17, 23, or 24. f_type is %i.\n", fsInfo.f_type);
+	filepathCF = CFStringCreateWithCString(kCFAllocatorDefault, inFile, kCFStringEncodingUTF8);
+	fileURL = CFURLCreateWithFileSystemPath(NULL, filepathCF, kCFURLPOSIXPathStyle, false);
+	CFRelease(filepathCF);
+	if (!_CFURLGetVolumePropertyFlags(fileURL, kCFURLVolumeSupportsDecmpFSCompression, &volFlags, NULL)) {
+		fputs("Error while checking if volume supports compression.\n", stderr);
+		CFRelease(fileURL);
 		return;
 	}
+	CFRelease(fileURL);
+	if ((volFlags & kCFURLVolumeSupportsDecmpFSCompression) == 0) {
+		fputs("Volume doesn't support AFSC compression.\n", stderr);
+		return;
+	}
+
 	if (!S_ISREG(inFileInfo->st_mode))
 		return;
 	if ((inFileInfo->st_flags & UF_COMPRESSED) != 0)
