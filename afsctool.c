@@ -146,11 +146,19 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 		CFRelease(fileURL);
 		return;
 	}
-	CFRelease(fileURL);
 	if ((volFlags & kCFURLVolumeSupportsDecmpFSCompression) == 0) {
-		fputs("Volume doesn't support AFSC compression.\n", stderr);
+		CFStringRef volFormatCF = NULL;
+		char volFormat[200];
+		if (!(CFURLCopyResourcePropertyForKey(fileURL, kCFURLVolumeLocalizedFormatDescriptionKey, &volFormatCF, NULL) && CFStringGetCString(volFormatCF, volFormat, 200, kCFStringEncodingUTF8))) {
+			strcpy(volFormat, "(unknown)");
+		}
+		fprintf(stderr, "Volume type %s doesn't support AFSC compression.\n", volFormat);
+		if (volFormatCF != NULL)
+			CFRelease(volFormatCF);
+		CFRelease(fileURL);
 		return;
 	}
+	CFRelease(fileURL);
 
 	if (!S_ISREG(inFileInfo->st_mode))
 		return;
