@@ -24,6 +24,7 @@ typedef CF_OPTIONS(unsigned long long, CFURLVolumePropertyFlags) {
 CF_EXPORT Boolean _CFURLGetVolumePropertyFlags(CFURLRef url, CFURLVolumePropertyFlags mask, CFURLVolumePropertyFlags *flags, CFErrorRef *error) CF_AVAILABLE(10_6, 4_0);
 
 bool checkVolumeSupportsCompression(CFURLRef url, bool *supported, CFErrorRef *error) {
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
 	if (kCFURLVolumeSupportsCompressionKey) {
 		CFBooleanRef supportedCF;
 		if (!CFURLCopyResourcePropertyForKey(url, kCFURLVolumeSupportsCompressionKey, &supportedCF, error)) {
@@ -31,7 +32,9 @@ bool checkVolumeSupportsCompression(CFURLRef url, bool *supported, CFErrorRef *e
 		}
 		*supported = (bool) CFBooleanGetValue(supportedCF);
 		CFRelease(supportedCF);
-	} else {
+	} else
+#endif
+	{
 		CFURLVolumePropertyFlags volFlags;
 		if (!_CFURLGetVolumePropertyFlags(url, kCFURLVolumeSupportsDecmpFSCompression, &volFlags, error)) {
 			return false;
