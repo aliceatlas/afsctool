@@ -17,12 +17,29 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
 
-// From CFURLPriv.h
-// TODO: there is a public API for this as of macOS 10.12 (though this private one remains available and working); we should probably use dlsym to dynamically find the symbols we need for each approach, use the newer public one if it is available, and fall back to this one otherwise.
+// From CFURLPriv.h - use this if the public API introduced in 10.12 is unavailable at runtime
 typedef CF_OPTIONS(unsigned long long, CFURLVolumePropertyFlags) {
-	kCFURLVolumeSupportsDecmpFSCompression = 0x800000000000000LL
+	kCFURLVolumeSupportsDecmpFSCompression = 1LL << 59
 };
 CF_EXPORT Boolean _CFURLGetVolumePropertyFlags(CFURLRef url, CFURLVolumePropertyFlags mask, CFURLVolumePropertyFlags *flags, CFErrorRef *error) CF_AVAILABLE(10_6, 4_0);
+
+bool checkVolumeSupportsCompression(CFURLRef url, bool *supported, CFErrorRef *error) {
+	if (kCFURLVolumeSupportsCompressionKey) {
+		CFBooleanRef supportedCF;
+		if (!CFURLCopyResourcePropertyForKey(url, kCFURLVolumeSupportsCompressionKey, &supportedCF, error)) {
+			return false;
+		}
+		*supported = (bool) CFBooleanGetValue(supportedCF);
+		CFRelease(supportedCF);
+	} else {
+		CFURLVolumePropertyFlags volFlags;
+		if (!_CFURLGetVolumePropertyFlags(url, kCFURLVolumeSupportsDecmpFSCompression, &volFlags, error)) {
+			return false;
+		}
+		*supported = (volFlags & kCFURLVolumeSupportsDecmpFSCompression) != 0;
+	}
+	return true;
+}
 
 const char *sizeunit10_short[] = {"KB", "MB", "GB", "TB", "PB", "EB"};
 const char *sizeunit10_long[] = {"kilobytes", "megabytes", "gigabytes", "terabytes", "petabytes", "exabytes"};
@@ -123,7 +140,7 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 	FILE *in;
 	CFStringRef filepathCF;
 	CFURLRef fileURL;
-	CFURLVolumePropertyFlags volFlags;
+	bool compressionSupported;
 	unsigned int compblksize = 0x10000, numBlocks, outdecmpfsSize = 0;
 	void *inBuf, *outBuf, *outBufBlock, *outdecmpfsBuf, *currBlock, *blockStart;
 	long long int inBufPos, filesize = inFileInfo->st_size;
@@ -141,12 +158,12 @@ void compressFile(const char *inFile, struct stat *inFileInfo, long long int max
 	filepathCF = CFStringCreateWithCString(kCFAllocatorDefault, inFile, kCFStringEncodingUTF8);
 	fileURL = CFURLCreateWithFileSystemPath(NULL, filepathCF, kCFURLPOSIXPathStyle, false);
 	CFRelease(filepathCF);
-	if (!_CFURLGetVolumePropertyFlags(fileURL, kCFURLVolumeSupportsDecmpFSCompression, &volFlags, NULL)) {
+	if (!checkVolumeSupportsCompression(fileURL, &compressionSupported, NULL)) {
 		fputs("Error while checking if volume supports compression.\n", stderr);
 		CFRelease(fileURL);
 		return;
 	}
-	if ((volFlags & kCFURLVolumeSupportsDecmpFSCompression) == 0) {
+	if (!compressionSupported) {
 		CFStringRef volFormatCF = NULL;
 		char volFormat[200];
 		if (!(CFURLCopyResourcePropertyForKey(fileURL, kCFURLVolumeLocalizedFormatDescriptionKey, &volFormatCF, NULL) && CFStringGetCString(volFormatCF, volFormat, 200, kCFStringEncodingUTF8))) {
